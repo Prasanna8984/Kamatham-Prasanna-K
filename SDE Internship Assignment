@@ -1,0 +1,350 @@
+Frontend(React+Material UI)
+
+//Setting React Project:
+npx create-react-app crm-contact-manager
+cd crm-contact-manager
+
+//Install necessary components and requests:
+npm install @mui/material @emotion/react @emotion/styled axios
+
+//Create a Form:
+//In the source folder, create a components folder and we will add a new file ContactForm.js to handle the form for adding and editing contacts:
+
+// src/components/ContactForm.js
+import React, { useState, useEffect } from 'react';
+import { TextField, Button, Grid, Typography } from '@mui/material';
+import axios from 'axios';
+
+const ContactForm = ({ contactToEdit, onContactAddedOrUpdated }) => {
+    const [contact, setContact] = useState({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        company: '',
+        jobTitle: ''
+    });
+
+    useEffect(() => {
+        if (contactToEdit) {
+            setContact(contactToEdit);
+        }
+    }, [contactToEdit]);
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setContact({ ...contact, [name]: value });
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (contactToEdit) {
+            // Update contact
+            await axios.put(`/contacts/${contactToEdit._id}`, contact);
+        } else {
+            // Add new contact
+            await axios.post('/contacts', contact);
+        }
+        onContactAddedOrUpdated(); // Refresh the contact list
+        setContact({
+            firstName: '',
+            lastName: '',
+            email: '',
+            phone: '',
+            company: '',
+            jobTitle: ''
+        });
+    };
+
+    return (
+        <form onSubmit={handleSubmit}>
+            <Typography variant="h6">{contactToEdit ? 'Edit Contact' : 'Add New Contact'}</Typography>
+            <Grid container spacing={2}>
+                <Grid item xs={6}>
+                    <TextField
+                        label="First Name"
+                        name="firstName"
+                        value={contact.firstName}
+                        onChange={handleChange}
+                        fullWidth
+                        required
+                    />
+                </Grid>
+                <Grid item xs={6}>
+                    <TextField
+                        label="Last Name"
+                        name="lastName"
+                        value={contact.lastName}
+                        onChange={handleChange}
+                        fullWidth
+                        required
+                    />
+                </Grid>
+                <Grid item xs={6}>
+                    <TextField
+                        label="Email"
+                        name="email"
+                        value={contact.email}
+                        onChange={handleChange}
+                        fullWidth
+                        required
+                        type="email"
+                    />
+                </Grid>
+                <Grid item xs={6}>
+                    <TextField
+                        label="Phone Number"
+                        name="phone"
+                        value={contact.phone}
+                        onChange={handleChange}
+                        fullWidth
+                        required
+                    />
+                </Grid>
+                <Grid item xs={6}>
+                    <TextField
+                        label="Company"
+                        name="company"
+                        value={contact.company}
+                        onChange={handleChange}
+                        fullWidth
+                    />
+                </Grid>
+                <Grid item xs={6}>
+                    <TextField
+                        label="Job Title"
+                        name="jobTitle"
+                        value={contact.jobTitle}
+                        onChange={handleChange}
+                        fullWidth
+                    />
+                </Grid>
+                <Grid item xs={12}>
+                    <Button type="submit" variant="contained" color="primary">
+                        {contactToEdit ? 'Update Contact' : 'Add Contact'}
+                    </Button>
+                </Grid>
+            </Grid>
+        </form>
+    );
+};
+
+export default ContactForm;
+
+In the next step we will Create a ContactsTable.js component to display all contacts in a table.
+// src/components/ContactsTable.js
+
+import React, { useState, useEffect } from 'react';
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button, TablePagination } from '@mui/material';
+import axios from 'axios';
+
+const ContactsTable = ({ onContactEdit }) => {
+    const [contacts, setContacts] = useState([]);
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(5);
+
+    useEffect(() => {
+        const fetchContacts = async () => {
+            const result = await axios.get('/contacts');
+            setContacts(result.data);
+        };
+        fetchContacts();
+    }, []);
+
+    const handleDelete = async (id) => {
+        await axios.delete(`/contacts/${id}`);
+        setContacts(contacts.filter(contact => contact._id !== id));
+    };
+
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(+event.target.value);
+        setPage(0);
+    };
+
+    return (
+        <>
+            <TableContainer>
+                <Table>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell>First Name</TableCell>
+                            <TableCell>Last Name</TableCell>
+                            <TableCell>Email</TableCell>
+                            <TableCell>Phone</TableCell>
+                            <TableCell>Company</TableCell>
+                            <TableCell>Job Title</TableCell>
+                            <TableCell>Actions</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {contacts.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((contact) => (
+                            <TableRow key={contact._id}>
+                                <TableCell>{contact.firstName}</TableCell>
+                                <TableCell>{contact.lastName}</TableCell>
+                                <TableCell>{contact.email}</TableCell>
+                                <TableCell>{contact.phone}</TableCell>
+                                <TableCell>{contact.company}</TableCell>
+                                <TableCell>{contact.jobTitle}</TableCell>
+                                <TableCell>
+                                    <Button onClick={() => onContactEdit(contact)} variant="contained" color="primary">Edit</Button>
+                                    <Button onClick={() => handleDelete(contact._id)} variant="contained" color="secondary">Delete</Button>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+            <TablePagination
+                rowsPerPageOptions={[5, 10, 25]}
+                component="div"
+                count={contacts.length}
+                rowsPerPage={rowsPerPage}
+                page={page}
+                onPageChange={handleChangePage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+            />
+        </>
+    );
+};
+
+export default ContactsTable;
+
+Finally,we will combine integrate ContactForm and ContactsTable into the main App.js file.
+
+// src/App.js
+import React, { useState } from 'react';
+import { Container, Grid, Typography } from '@mui/material';
+import ContactForm from './components/ContactForm';
+import ContactsTable from './components/ContactsTable';
+
+function App() {
+    const [contactToEdit, setContactToEdit] = useState(null);
+
+    const handleContactAddedOrUpdated = () => {
+        setContactToEdit(null); // Refresh the list after adding or updating
+    };
+
+    const handleContactEdit = (contact) => {
+        setContactToEdit(contact); // Set contact to edit when clicking the edit button
+    };
+
+    return (
+        <Container>
+            <Typography variant="h4" gutterBottom>
+                Contact Management System
+            </Typography>
+            <Grid container spacing={3}>
+                <Grid item xs={12} sm={6}>
+                    <ContactForm contactToEdit={contactToEdit} onContactAddedOrUpdated={handleContactAddedOrUpdated} />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                    <ContactsTable onContactEdit={handleContactEdit} />
+                </Grid>
+            </Grid>
+        </Container>
+    );
+}
+
+export default App;
+
+Backend (Node.js + Express + MongoDB):
+Set up Node.js Project:
+
+mkdir crm-backend
+cd crm-backend
+npm init -y
+npm install express mongoose body-parser cors
+
+Creating Endpoints:
+
+Create an index.js file to define the Express app and to handle API requests:
+// backend/index.js
+const express = require('express');
+const mongoose = require('mongoose');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+
+// Initializing
+const app = express();
+app.use(cors());
+app.use(bodyParser.json());
+
+// Connecting to MongoDB
+mongoose.connect('mongodb://localhost:27017/crm', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+});
+
+// Defining Contact Schema
+const contactSchema = new mongoose.Schema({
+    firstName: String,
+    lastName: String,
+    email: String,
+    phone: String,
+    company: String,
+    jobTitle: String
+});
+
+const Contact = mongoose.model('Contact', contactSchema);
+
+// Creating a new contact
+app.post('/contacts', async (req, res) => {
+    try {
+        const newContact = new Contact(req.body);
+        await newContact.save();
+        res.status(201).json(newContact);
+    } catch (error) {
+        res.status(400).json({ error: 'Error adding contact' });
+    }
+});
+
+// Getting all contacts
+app.get('/contacts', async (req, res) => {
+    try {
+        const contacts = await Contact.find();
+        res.status(200).json(contacts);
+    } catch (error) {
+        res.status(400).json({ error: 'Error fetching contacts' });
+    }
+});
+
+// Updating the contact
+app.put('/contacts/:id', async (req, res) => {
+    try {
+        const updatedContact = await Contact.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        res.status(200).json(updatedContact);
+    } catch (error) {
+        res.status(400).json({ error: 'Error updating contact' });
+    }
+});
+
+// Deleting the contact
+app.delete('/contacts/:id', async (req, res) => {
+    try {
+        await Contact.findByIdAndDelete(req.params.id);
+        res.status(200).json({ message: 'Contact deleted' });
+    } catch (error) {
+        res.status(400).json({ error: 'Error deleting contact' });
+    }
+});
+
+// Starting the server
+const port = 5000;
+app.listen(port, () => {
+    console.log(`Server running on http://localhost:${port}`);
+});
+
+Final Step:
+Run the project: 
+//Starting the backend server:
+
+node backend/index.js
+//Starting the frontend server:
+
+npm start
+
+
